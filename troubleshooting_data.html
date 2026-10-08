@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Test Troubleshooting Data</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17233b;
+      --muted: #718096;
+      --line: #e5eaf2;
+      --brand: #3157d5;
+      --brand-dark: #2345b4;
+      --surface: #fff;
+      --canvas: #f5f7fb;
+      --green: #147d64;
+      --red: #b83232;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 34px 0 56px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand-mark { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; color: var(--brand); background: #e7edff; font-size: 23px; }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: clamp(22px, 3vw, 30px); letter-spacing: -.04em; }
+    h2 { font-size: 18px; letter-spacing: -.02em; }
+    .subtitle { margin-top: 5px; color: var(--muted); font-size: 14px; }
+    .saved-state { color: var(--green); font-size: 13px; font-weight: 650; white-space: nowrap; }
+    .saved-state::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #31a881; }
+    .notice { display: none; margin-bottom: 16px; padding: 11px 13px; border: 1px solid #f1c5c5; border-radius: 9px; color: var(--red); background: #fff4f4; font-size: 13px; }
+    .notice.visible { display: block; }
+    .notice.success { border-color: #b8e2d3; color: var(--green); background: #effaf5; }
+    .notice ul { margin: 7px 0 0; padding-left: 20px; }
+    .notice li + li { margin-top: 3px; }
+    .tabs { display: flex; gap: 8px; padding: 5px; margin-bottom: 18px; border: 1px solid var(--line); border-radius: 12px; background: #eef1f7; }
+    .tab { padding: 10px 16px; border: 0; border-radius: 8px; color: #596780; background: transparent; font-weight: 700; }
+    .tab[aria-selected="true"] { color: var(--brand); background: #fff; box-shadow: 0 2px 6px #24365b12; }
+    .panel[hidden] { display: none; }
+    .card { padding: 22px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); box-shadow: 0 5px 18px #24365b08; }
+    .form-card { max-width: 760px; margin: 0 auto; }
+    .intro { margin: 6px 0 21px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .field { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 7px; color: #46536b; font-size: 12px; font-weight: 700; }
+    input, select, textarea { width: 100%; min-height: 43px; padding: 10px 11px; border: 1px solid #dce2ec; border-radius: 9px; color: var(--ink); background: #fff; outline: none; }
+    textarea { min-height: 135px; resize: vertical; line-height: 1.5; }
+    input:focus, select:focus, textarea:focus { border-color: #8299ef; box-shadow: 0 0 0 3px #3157d51a; }
+    input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: #d64545; }
+    .paste-help { margin: -7px 0 9px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .paste-button { width: 100%; border: 1px dashed #aebbd2; color: #435471; background: #f8f9fc; white-space: normal; }
+    .paste-button:hover, .paste-button:focus { border-color: var(--brand); background: #f0f3ff; }
+    .image-previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 11px; }
+    .image-preview { position: relative; width: 112px; padding: 5px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+    .image-preview img { display: block; width: 100%; height: 76px; border-radius: 5px; object-fit: contain; background: #f4f6fa; }
+    .image-preview button { width: 100%; margin-top: 4px; padding: 5px; border: 0; border-radius: 6px; color: var(--red); background: #fff2f2; font-size: 11px; }
+    .remarks-images { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .remarks-images a { display: block; }
+    .remarks-images img { display: block; width: 100px; height: 70px; border: 1px solid var(--line); border-radius: 6px; object-fit: contain; background: #f4f6fa; }
+    .form-footer { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+    .primary, .secondary, .text-button { border: 0; border-radius: 9px; font-weight: 700; }
+    .primary { padding: 12px 18px; color: #fff; background: var(--brand); }
+    .primary:hover { background: var(--brand-dark); }
+    .secondary { padding: 10px 13px; color: #394966; background: #eef1f7; }
+    .secondary:hover { background: #e3e8f1; }
+    .text-button { padding: 7px 8px; color: var(--brand); background: transparent; font-size: 12px; }
+    .text-button:hover { background: #edf1ff; }
+    .view-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .tools { display: flex; align-items: center; gap: 9px; }
+    .tools input { width: min(330px, 32vw); }
+    .tools .secondary { white-space: nowrap; }
+    .count { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: #f8f9fc; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+    td { padding: 13px 12px; border-bottom: 1px solid #edf0f5; font-size: 13px; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .date-cell { color: var(--muted); white-space: nowrap; }
+    .model-cell, .testcase-cell { min-width: 125px; font-weight: 650; }
+    .remarks-cell { min-width: 190px; max-width: 340px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .link-cell { min-width: 140px; max-width: 240px; overflow-wrap: anywhere; }
+    .link-cell a { color: var(--brand); }
+    .actions { text-align: right; white-space: nowrap; }
+    .empty { padding: 45px 16px; color: var(--muted); text-align: center; }
+    .empty strong { display: block; margin-bottom: 5px; color: #44516a; }
+    .footnote { margin-top: 15px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    @media (max-width: 700px) {
+      .shell { width: min(100% - 24px, 520px); padding-top: 23px; }
+      .topbar, .view-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .card { padding: 16px; }
+      .tools { width: 100%; }
+      .tools input { min-width: 0; width: auto; flex: 1; }
+      .form-footer { align-items: stretch; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">⌕</div>
+        <div>
+          <h1>Test troubleshooting records</h1>
+          <p class="subtitle">Gather model, testcase, test log, and troubleshooting details.</p>
+        </div>
+      </div>
+      <div class="saved-state">Saved in this browser</div>
+    </header>
+
+    <div id="notice" class="notice" role="alert"></div>
+
+    <nav class="tabs" role="tablist" aria-label="Data gathering views">
+      <button id="viewTab" class="tab" type="button" role="tab" aria-selected="true" aria-controls="viewPanel">View Records</button>
+      <button id="gatherTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="gatherPanel" tabindex="-1">Gather Data</button>
+    </nav>
+
+    <section id="viewPanel" class="panel" role="tabpanel" aria-labelledby="viewTab">
+      <div class="card">
+        <div class="view-head">
+          <div>
+            <h2>View gathered data</h2>
+            <p class="subtitle">Search across models, testcases, links, and remarks.</p>
+            <p id="recordCount" class="count"></p>
+          </div>
+          <div class="tools">
+            <input id="search" type="search" aria-label="Search records" placeholder="Search records">
+            <input id="importFile" type="file" accept=".xlsx,.xls,.csv" hidden>
+            <button id="importButton" class="secondary" type="button">Import &amp; merge</button>
+            <button id="exportButton" class="secondary" type="button">Export all to Excel</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date added</th>
+                <th>Model</th>
+                <th>Testcase</th>
+                <th>Testlog link</th>
+                <th>Troubleshooting remarks</th>
+                <th aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody id="recordRows"></tbody>
+          </table>
+          <div id="emptyState" class="empty" hidden>
+            <strong>No records found</strong>
+            <span>Add a record or change your search.</span>
+          </div>
+        </div>
+        <p class="footnote">Records and pasted screenshots are saved in this browser on this device. Import accepts Excel or CSV data and merges by Model + Testcase; matching records are refreshed while their saved screenshots are kept. Excel exports include image counts, not the image files themselves.</p>
+      </div>
+    </section>
+
+    <section id="gatherPanel" class="panel" role="tabpanel" aria-labelledby="gatherTab" hidden>
+      <div class="card form-card">
+        <h2 id="formTitle">Add a troubleshooting record</h2>
+        <p class="intro">Enter the test details below. Paste screenshots into the remarks area; records are saved in this browser and can be exported to Excel.</p>
+        <form id="recordForm" novalidate>
+          <input id="recordId" type="hidden">
+          <div class="field">
+            <label for="model">Model</label>
+            <select id="model" name="model" required>
+              <option value="">Select a model</option>
+              <option>Ambrose</option>
+              <option>BF21</option>
+              <option>Nanaka</option>
+              <option>Teton3</option>
+              <option>Penrose</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="testcase">Testcase</label>
+            <input id="testcase" name="testcase" type="text" maxlength="180" placeholder="Enter testcase name or ID" required>
+          </div>
+          <div class="field">
+            <label for="testlog">Testlog link</label>
+            <input id="testlog" name="testlog" type="url" maxlength="1000" placeholder="https://...">
+          </div>
+          <div class="field">
+            <label for="remarks">Troubleshooting remarks</label>
+            <textarea id="remarks" name="remarks" maxlength="5000" placeholder="Describe the issue, checks performed, and resolution or next steps"></textarea>
+            <p class="paste-help">Write remarks, or paste a screenshot (Ctrl+V) into this box or the button below. Images are resized to save space; up to 5 screenshots per record.</p>
+            <button id="pasteImageButton" class="secondary paste-button" type="button">Click here, then press Ctrl+V to paste a screenshot</button>
+            <div id="imagePreviews" class="image-previews" aria-live="polite"></div>
+          </div>
+          <div class="form-footer">
+            <button id="saveButton" class="primary" type="submit">Save record</button>
+            <button id="cancelEdit" class="secondary" type="button" hidden>Cancel edit</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "test-troubleshooting-records.v1";
+      const form = document.getElementById("recordForm");
+      const notice = document.getElementById("notice");
+      const rows = document.getElementById("recordRows");
+      let records = [];
+      let remarkImages = [];
+
+      const showNotice = message => {
+        notice.classList.remove("success");
+        notice.textContent = message;
+        notice.classList.add("visible");
+      };
+
+      const showImportSuccess = message => {
+        notice.classList.add("success");
+        notice.textContent = message;
+        notice.classList.add("visible");
+      };
+
+      const showMissingFields = fields => {
+        notice.replaceChildren();
+        notice.classList.remove("success");
+        const message = document.createElement("strong");
+        message.textContent = "Please complete the following required fields before saving:";
+        const list = document.createElement("ul");
+        for (const { id, label } of fields) {
+          const item = document.createElement("li");
+          item.textContent = label;
+          list.append(item);
+          const control = document.getElementById(id);
+          control.setAttribute("aria-invalid", "true");
+          control.addEventListener("input", () => control.removeAttribute("aria-invalid"), { once: true });
+          control.addEventListener("change", () => control.removeAttribute("aria-invalid"), { once: true });
+        }
+        notice.append(message, list);
+        notice.classList.add("visible");
+        document.getElementById(fields[0].id).focus();
+        notice.scrollIntoView({ behavior: "smooth", block: "center" });
+      };
+
+      const hideNotice = () => {
+        notice.textContent = "";
+        notice.classList.remove("visible");
+      };
+
+      const renderImagePreviews = () => {
+        const container = document.getElementById("imagePreviews");
+        container.replaceChildren();
+        remarkImages.forEach((image, index) => {
+          const preview = document.createElement("div");
+          preview.className = "image-preview";
+          const img = document.createElement("img");
+          img.src = image.dataUrl;
+          img.alt = `Pasted troubleshooting image ${index + 1}`;
+          const removeButton = document.createElement("button");
+          removeButton.type = "button";
+          removeButton.textContent = "Remove image";
+          removeButton.addEventListener("click", () => {
+            remarkImages.splice(index, 1);
+            renderImagePreviews();
+          });
+          preview.append(img, removeButton);
+          container.append(preview);
+        });
+      };
+
+      const blobToDataUrl = blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+          if (typeof reader.result !== "string") {
+            reject(new Error("The pasted image could not be read."));
+            return;
+          }
+          resolve(reader.result);
+        }, { once: true });
+        reader.addEventListener("error", () => reject(reader.error || new Error("The pasted image could not be read.")), { once: true });
+        reader.readAsDataURL(blob);
+      });
+
+      const canvasToJpeg = (canvas, quality) => new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error("The image could not be converted for saving."));
+        }, "image/jpeg", quality);
+      });
+
+      const prepareImage = async file => {
+        const bitmap = await createImageBitmap(file);
+        try {
+          const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+          canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+          const context = canvas.getContext("2d");
+          if (!context) throw new Error("The browser could not prepare the pasted image.");
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          for (const quality of [0.82, 0.68, 0.54, 0.4]) {
+            const compressed = await canvasToJpeg(canvas, quality);
+            if (compressed.size <= 1024 * 1024) {
+              return {
+                name: `${(file.name || "pasted-image").replace(/\.[^.]+$/, "")}.jpg`,
+                type: "image/jpeg",
+                dataUrl: await blobToDataUrl(compressed)
+              };
+            }
+          }
+          throw new Error("This image is too large to save, even after compression. Copy a smaller screenshot and try again.");
+        } finally {
+          bitmap.close();
+        }
+      };
+
+      const addPastedImages = async files => {
+        const remaining = 5 - remarkImages.length;
+        if (remaining <= 0) {
+          showNotice("A record can contain up to 5 pasted images. Remove an image before adding another.");
+          return;
+        }
+        if (files.length > remaining) {
+          showNotice(`Only ${remaining} more image${remaining === 1 ? "" : "s"} can be added to this record. Extra pasted images were skipped.`);
+        }
+        for (const file of files.slice(0, remaining)) {
+          try {
+            remarkImages.push(await prepareImage(file));
+          } catch (error) {
+            showNotice(`Could not add pasted image: ${error.message}`);
+          }
+        }
+        renderImagePreviews();
+      };
+
+      const handleImagePaste = event => {
+        const files = [...(event.clipboardData?.items || [])]
+          .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+          .map(item => item.getAsFile())
+          .filter(Boolean);
+        if (files.length) {
+          event.preventDefault();
+          void addPastedImages(files);
+        }
+      };
+
+      const readRecords = () => {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw === null) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) throw new Error("Saved data is not in the expected format.");
+        return parsed;
+      };
+
+      const saveRecords = nextRecords => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
+          records = nextRecords;
+          hideNotice();
+          render();
+          return true;
+        } catch (error) {
+          showNotice(`Could not save this record in the browser: ${error.message}`);
+          return false;
+        }
+      };
+
+      const visibleRecords = () => {
+        const query = document.getElementById("search").value.trim().toLocaleLowerCase();
+        return records
+          .filter(record => !query || [record.model, record.testcase, record.testlog, record.remarks]
+            .some(value => String(value || "").toLocaleLowerCase().includes(query)))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      };
+
+      const makeCell = (row, className, text) => {
+        const cell = document.createElement("td");
+        if (className) cell.className = className;
+        cell.textContent = text;
+        row.append(cell);
+        return cell;
+      };
+
+      const render = () => {
+        const visible = visibleRecords();
+        rows.replaceChildren();
+        for (const record of visible) {
+          const row = document.createElement("tr");
+          const date = new Date(record.createdAt);
+          makeCell(row, "date-cell", Number.isNaN(date.getTime())
+            ? "Unknown"
+            : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }));
+          makeCell(row, "model-cell", record.model);
+          makeCell(row, "testcase-cell", record.testcase);
+          const linkCell = makeCell(row, "link-cell", "");
+          if (record.testlog) {
+            const link = document.createElement("a");
+            link.href = record.testlog;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = record.testlog;
+            linkCell.append(link);
+          } else {
+            linkCell.textContent = "—";
+          }
+          const remarksCell = makeCell(row, "remarks-cell", record.remarks || "");
+          const images = Array.isArray(record.remarkImages) ? record.remarkImages : [];
+          const safeImages = images.filter(image => /^data:image\/jpeg;base64,/.test(image.dataUrl || ""));
+          if (safeImages.length) {
+            const imageList = document.createElement("div");
+            imageList.className = "remarks-images";
+            for (const [index, image] of safeImages.entries()) {
+              const link = document.createElement("a");
+              link.href = image.dataUrl;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.setAttribute("aria-label", `Open troubleshooting image ${index + 1}`);
+              const img = document.createElement("img");
+              img.src = image.dataUrl;
+              img.alt = image.name || `Troubleshooting image ${index + 1}`;
+              link.append(img);
+              imageList.append(link);
+            }
+            if (imageList.childElementCount) remarksCell.append(imageList);
+          }
+          const actions = makeCell(row, "actions", "");
+          const editButton = document.createElement("button");
+          editButton.type = "button";
+          editButton.className = "text-button";
+          editButton.textContent = "Edit";
+          editButton.setAttribute("aria-label", `Edit ${record.model} ${record.testcase}`);
+          editButton.addEventListener("click", () => startEdit(record.id));
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "text-button";
+          deleteButton.textContent = "Delete";
+          deleteButton.setAttribute("aria-label", `Delete ${record.model} ${record.testcase}`);
+          deleteButton.addEventListener("click", () => deleteRecord(record.id));
+          actions.append(editButton, deleteButton);
+          rows.append(row);
+        }
+        document.getElementById("recordCount").textContent = `${visible.length} of ${records.length} record${records.length === 1 ? "" : "s"}`;
+        document.getElementById("emptyState").hidden = visible.length > 0;
+      };
+
+      const setTab = selected => {
+        const gatherSelected = selected === "gather";
+        document.getElementById("gatherPanel").hidden = !gatherSelected;
+        document.getElementById("viewPanel").hidden = gatherSelected;
+        document.getElementById("gatherTab").setAttribute("aria-selected", String(gatherSelected));
+        document.getElementById("viewTab").setAttribute("aria-selected", String(!gatherSelected));
+        document.getElementById("gatherTab").tabIndex = gatherSelected ? 0 : -1;
+        document.getElementById("viewTab").tabIndex = gatherSelected ? -1 : 0;
+      };
+
+      const resetForm = () => {
+        form.reset();
+        document.getElementById("recordId").value = "";
+        document.getElementById("formTitle").textContent = "Add a troubleshooting record";
+        document.getElementById("saveButton").textContent = "Save record";
+        document.getElementById("cancelEdit").hidden = true;
+        form.querySelectorAll("[aria-invalid='true']").forEach(control => control.removeAttribute("aria-invalid"));
+        remarkImages = [];
+        renderImagePreviews();
+      };
+
+      const startEdit = id => {
+        const record = records.find(item => item.id === id);
+        if (!record) return;
+        document.getElementById("recordId").value = record.id;
+        document.getElementById("model").value = record.model;
+        document.getElementById("testcase").value = record.testcase;
+        document.getElementById("testlog").value = record.testlog || "";
+        document.getElementById("remarks").value = record.remarks;
+        remarkImages = Array.isArray(record.remarkImages) ? [...record.remarkImages] : [];
+        renderImagePreviews();
+        form.querySelectorAll("[aria-invalid='true']").forEach(control => control.removeAttribute("aria-invalid"));
+        document.getElementById("formTitle").textContent = "Edit troubleshooting record";
+        document.getElementById("saveButton").textContent = "Save changes";
+        document.getElementById("cancelEdit").hidden = false;
+        setTab("gather");
+        document.getElementById("model").focus();
+        document.querySelector(".form-card").scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+
+      const deleteRecord = id => {
+        const record = records.find(item => item.id === id);
+        if (!record || !window.confirm(`Delete the ${record.model} / ${record.testcase} record? This cannot be undone.`)) return;
+        if (saveRecords(records.filter(item => item.id !== id)) && document.getElementById("recordId").value === id) resetForm();
+      };
+
+      const csvSafeCell = value => {
+        let text = String(value ?? "");
+        if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
+        return `"${text.replaceAll('"', '""')}"`;
+      };
+
+      const normalizeHeader = value => String(value ?? "").toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+      const normalizeKey = value => String(value ?? "").trim().toLocaleLowerCase();
+      const recordKey = record => `${normalizeKey(record.model)}\u0000${normalizeKey(record.testcase)}`;
+
+      const parseImportDate = value => {
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+        if (typeof value === "number" && window.XLSX?.SSF) {
+          const parsed = XLSX.SSF.parse_date_code(value);
+          if (parsed) return new Date(parsed.y, parsed.m - 1, parsed.d, parsed.H, parsed.M, parsed.S).toISOString();
+        }
+        if (value !== undefined && value !== null && String(value).trim()) {
+          const parsed = new Date(String(value).trim());
+          if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+        }
+        return "";
+      };
+
+      const parseImportRows = matrix => {
+        const headerIndex = matrix.findIndex(row => {
+          const headerSet = new Set(row.map(normalizeHeader));
+          return headerSet.has("model") && headerSet.has("testcase");
+        });
+        if (headerIndex < 0) throw new Error("Could not find a header row with Model and Testcase columns.");
+
+        const headers = matrix[headerIndex].map(normalizeHeader);
+        const findColumn = (...aliases) => headers.findIndex(header => aliases.includes(header));
+        const columns = {
+          model: findColumn("model"),
+          testcase: findColumn("testcase"),
+          testlog: findColumn("testloglink", "testlogurl", "testlog"),
+          remarks: findColumn("troubleshootingremarks", "remarks", "troubleshooting"),
+          createdAt: findColumn("dateadded", "datecreated", "createdat", "date"),
+          imageCount: findColumn("pastedimagecount", "imagecount"),
+          images: [1, 2, 3, 4, 5].map(number => findColumn(`pastedimage${number}`, `image${number}`))
+        };
+        const missingHeaders = [
+          ["testlog", "Testlog Link"],
+          ["remarks", "Troubleshooting Remarks"]
+        ].filter(([key]) => columns[key] < 0).map(([, label]) => label);
+        if (missingHeaders.length) {
+          throw new Error(`Required columns are missing: ${missingHeaders.join(", ")}. Import a troubleshooting data export with Model, Testcase, Testlog Link, and Troubleshooting Remarks columns.`);
+        }
+
+        const allowedModels = new Map(["Ambrose", "BF21", "Nanaka", "Teton3", "Penrose"].map(model => [normalizeKey(model), model]));
+        const imported = new Map();
+        const problems = [];
+        let skippedRows = 0;
+        let duplicateRows = 0;
+        for (let rowIndex = headerIndex + 1; rowIndex < matrix.length; rowIndex += 1) {
+          const row = matrix[rowIndex] || [];
+          const cell = key => columns[key] < 0 ? "" : String(row[columns[key]] ?? "").trim();
+          const modelInput = cell("model");
+          const testcase = cell("testcase");
+          const testlog = cell("testlog");
+          const remarks = cell("remarks");
+          const rowImages = columns.images
+            .filter(index => index >= 0)
+            .map(index => String(row[index] ?? "").trim())
+            .filter(Boolean);
+          if (![modelInput, testcase, testlog, remarks].some(Boolean)) {
+            skippedRows += 1;
+            continue;
+          }
+          const model = allowedModels.get(normalizeKey(modelInput));
+          const sheetRow = rowIndex + 1;
+          if (!model) problems.push(`Row ${sheetRow}: Model must be one of Ambrose, BF21, Nanaka, Teton3, or Penrose.`);
+          if (!testcase) problems.push(`Row ${sheetRow}: Testcase is missing.`);
+          if (!testlog) problems.push(`Row ${sheetRow}: Testlog Link is missing.`);
+          if (testlog) {
+            try {
+              if (!["http:", "https:"].includes(new URL(testlog).protocol)) throw new Error();
+            } catch {
+              problems.push(`Row ${sheetRow}: Testlog Link must be a valid http or https URL.`);
+            }
+          }
+
+          const key = model && testcase ? recordKey({ model, testcase }) : "";
+          const existing = records.find(record => recordKey(record) === key);
+          const priorImported = imported.get(key);
+          const inheritedRemarks = remarks || priorImported?.remarks || existing?.remarks || "";
+          const imageCount = columns.imageCount < 0 ? 0 : Number(row[columns.imageCount] || 0);
+          const inheritedImages = [
+            ...(priorImported?.remarkImages || []),
+            ...(existing?.remarkImages || [])
+          ];
+          for (const [imageIndex, dataUrl] of rowImages.entries()) {
+            if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl) || dataUrl.length > 1400000) {
+              problems.push(`Row ${sheetRow}: Pasted Image ${imageIndex + 1} must be a JPEG data URL no larger than 1 MB.`);
+            }
+          }
+          const allImages = [...new Map([...inheritedImages, ...rowImages.map(dataUrl => ({ name: "imported-image.jpg", type: "image/jpeg", dataUrl }))]
+            .map(image => [image.dataUrl, image])).values()];
+          if (allImages.length > 5) problems.push(`Row ${sheetRow}: No more than 5 pasted images can be saved on a record.`);
+          if (!inheritedRemarks && allImages.length === 0 && !(Number.isFinite(imageCount) && imageCount > 0 && existing?.remarkImages?.length)) {
+            problems.push(`Row ${sheetRow}: Troubleshooting Remarks is missing (the workbook image count does not contain the image itself).`);
+          }
+          if (!model || !testcase) continue;
+
+          if (imported.has(key)) duplicateRows += 1;
+          const importedDate = columns.createdAt < 0 ? "" : parseImportDate(row[columns.createdAt]);
+          imported.set(key, {
+            model,
+            testcase,
+            testlog: testlog || priorImported?.testlog || existing?.testlog || "",
+            remarks: inheritedRemarks,
+            remarkImages: allImages,
+            importedDate: importedDate || priorImported?.importedDate || "",
+            sheetRow
+          });
+        }
+        if (problems.length) {
+          const shown = problems.slice(0, 8);
+          const rest = problems.length - shown.length;
+          throw new Error(`Import cancelled; fix these issues and try again:\n${shown.join("\n")}${rest ? `\n…and ${rest} more issue${rest === 1 ? "" : "s"}.` : ""}`);
+        }
+        if (imported.size === 0) throw new Error("No data rows were found to import.");
+        return { imported, skippedRows, duplicateRows };
+      };
+
+      const mergeImportedRecords = ({ imported, skippedRows, duplicateRows }) => {
+        const nextRecords = [...records];
+        const existingIndexByKey = new Map();
+        nextRecords.forEach((record, index) => {
+          const key = recordKey(record);
+          if (!existingIndexByKey.has(key)) existingIndexByKey.set(key, index);
+        });
+        let added = 0;
+        let updated = 0;
+        for (const [key, incoming] of imported) {
+          const existingIndex = existingIndexByKey.get(key);
+          const current = existingIndex === undefined ? null : nextRecords[existingIndex];
+          if (current) {
+            nextRecords[existingIndex] = {
+              ...current,
+              model: incoming.model,
+              testcase: incoming.testcase,
+              testlog: incoming.testlog || current.testlog,
+              remarks: incoming.remarks || current.remarks,
+              remarkImages: incoming.remarkImages,
+              updatedAt: new Date().toISOString()
+            };
+            updated += 1;
+          } else {
+            const createdAt = incoming.importedDate || new Date().toISOString();
+            const newRecord = {
+              id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              model: incoming.model,
+              testcase: incoming.testcase,
+              testlog: incoming.testlog,
+              remarks: incoming.remarks,
+              remarkImages: incoming.remarkImages,
+              createdAt,
+              updatedAt: new Date().toISOString()
+            };
+            existingIndexByKey.set(key, nextRecords.length);
+            nextRecords.push(newRecord);
+            added += 1;
+          }
+        }
+        if (!saveRecords(nextRecords)) return;
+        showImportSuccess(`Import complete: ${added} added, ${updated} updated${duplicateRows ? `, ${duplicateRows} duplicate input row${duplicateRows === 1 ? "" : "s"} merged` : ""}${skippedRows ? `, ${skippedRows} blank row${skippedRows === 1 ? "" : "s"} skipped` : ""}. Existing screenshots were retained; images are imported only when provided as JPEG data.`);
+      };
+
+      const importFile = async file => {
+        if (!file) return;
+        if (file.size > 25 * 1024 * 1024) throw new Error("Import file is larger than 25 MB. Please choose a smaller workbook.");
+        if (!window.XLSX) throw new Error("The Excel import library could not load. Check your internet connection and reload the page.");
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) throw new Error("The selected file has no worksheets.");
+        const matrix = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { header: 1, defval: "", raw: true });
+        mergeImportedRecords(parseImportRows(matrix));
+      };
+
+      form.addEventListener("submit", event => {
+        event.preventDefault();
+        const id = document.getElementById("recordId").value;
+        const model = document.getElementById("model").value.trim();
+        const testcase = document.getElementById("testcase").value.trim();
+        const testlog = document.getElementById("testlog").value.trim();
+        const remarks = document.getElementById("remarks").value.trim();
+        const missingFields = [
+          { id: "model", label: "Model" },
+          { id: "testcase", label: "Testcase" },
+          { id: "testlog", label: "Testlog link" }
+        ].filter(field => !document.getElementById(field.id).value.trim());
+        if (!remarks && remarkImages.length === 0) {
+          missingFields.push({ id: "remarks", label: "Troubleshooting remarks or pasted image" });
+        }
+        form.querySelectorAll("[aria-invalid='true']").forEach(control => control.removeAttribute("aria-invalid"));
+        if (missingFields.length) {
+          showMissingFields(missingFields);
+          return;
+        }
+        if (testlog) {
+          let parsedLink;
+          try {
+            parsedLink = new URL(testlog);
+          } catch {
+            showNotice("Enter a valid testlog link, or leave the link empty.");
+            return;
+          }
+          if (!["http:", "https:"].includes(parsedLink.protocol)) {
+            showNotice("The testlog link must use http or https.");
+            return;
+          }
+        }
+        const previous = records.find(item => item.id === id);
+        const record = {
+          id: id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+          model,
+          testcase,
+          testlog,
+          remarks,
+          remarkImages: [...remarkImages],
+          createdAt: previous?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        const next = previous ? records.map(item => item.id === id ? record : item) : [...records, record];
+        if (saveRecords(next)) resetForm();
+      });
+
+      document.getElementById("gatherTab").addEventListener("click", () => setTab("gather"));
+      document.getElementById("viewTab").addEventListener("click", () => setTab("view"));
+      document.getElementById("search").addEventListener("input", render);
+      document.getElementById("cancelEdit").addEventListener("click", resetForm);
+      document.getElementById("importButton").addEventListener("click", () => document.getElementById("importFile").click());
+      document.getElementById("importFile").addEventListener("change", async event => {
+        const fileInput = event.currentTarget;
+        const file = fileInput.files?.[0];
+        try {
+          await importFile(file);
+        } catch (error) {
+          showNotice(`Could not import data: ${error.message}`);
+        } finally {
+          fileInput.value = "";
+        }
+      });
+      document.getElementById("remarks").addEventListener("paste", handleImagePaste);
+      document.getElementById("pasteImageButton").addEventListener("paste", handleImagePaste);
+      document.getElementById("pasteImageButton").addEventListener("click", event => event.currentTarget.focus());
+      document.getElementById("exportButton").addEventListener("click", () => {
+        const exportRecords = [...records].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const headings = ["Date Added", "Model", "Testcase", "Testlog Link", "Troubleshooting Remarks", "Pasted Image Count"];
+        const data = exportRecords.map(record => [
+          record.createdAt || "",
+          record.model, record.testcase, record.testlog, record.remarks,
+          Array.isArray(record.remarkImages) ? record.remarkImages.length : 0
+        ]);
+        if (window.XLSX) {
+          try {
+            const workbook = XLSX.utils.book_new();
+            const worksheet = XLSX.utils.aoa_to_sheet([headings, ...data]);
+            worksheet["!cols"] = [{ wch: 22 }, { wch: 24 }, { wch: 32 }, { wch: 48 }, { wch: 70 }, { wch: 18 }];
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Troubleshooting Data");
+            XLSX.writeFile(workbook, "troubleshooting_data.xlsx");
+            return;
+          } catch (error) {
+            showNotice(`Excel export failed: ${error.message}`);
+            return;
+          }
+        }
+        const csv = [headings, ...data].map(row => row.map(csvSafeCell).join(",")).join("\r\n");
+        const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "troubleshooting_data.csv";
+        link.click();
+        URL.revokeObjectURL(url);
+        showNotice("The Excel export library could not load, so the records were downloaded as an Excel-compatible CSV instead.");
+      });
+
+      document.getElementById("search").value = "";
+      try {
+        records = readRecords();
+        hideNotice();
+      } catch (error) {
+        showNotice(`Could not read saved records: ${error.message}`);
+      }
+      render();
+    })();
+  </script>
+</body>
+</html>
